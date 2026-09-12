@@ -73,6 +73,14 @@ export class QuimiGenBot {
         await this.#confirmResume(text, chatId, userId);
         return;
       }
+      if (/^\/hint(?:@\w+)?\b/i.test(text)) {
+        await this.#showEntryHelp(text, chatId, userId, "hint");
+        return;
+      }
+      if (/^\/solution(?:@\w+)?\b/i.test(text)) {
+        await this.#showEntryHelp(text, chatId, userId, "solution");
+        return;
+      }
 
       const intake = await this.store.getPendingIntake(chatId);
       if (intake && intake.ownerUserId !== userId) {
@@ -196,6 +204,20 @@ export class QuimiGenBot {
       return resumed;
     });
     await this.telegram.sendMessage(chatId, `Plan ${id} reanudado con la misma cola v${version}.`);
+  }
+
+  async #showEntryHelp(text, chatId, userId, kind) {
+    const command = kind === "hint" ? "/hint" : "/solution";
+    const [id, entryId] = parseArguments(text, command, 2);
+    const plan = await this.#ownedPlan(id, chatId, userId);
+    const delivered = plan.receipts.some(
+      (receipt) => receipt.entryId === entryId && receipt.status === "sent",
+    );
+    if (!delivered) throw new Error("Esa entrada todavía no fue entregada.");
+    const entry = plan.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) throw new Error("Entrada no encontrada.");
+    const content = kind === "hint" ? `Pistas:\n• ${entry.hints.join("\n• ")}` : `Solución revisable:\n${entry.solution}`;
+    await this.telegram.sendMessage(chatId, `${plan.id} · ${entry.id}\n${content}`);
   }
 
   async #ownedPlan(id, chatId, userId) {

@@ -8,9 +8,18 @@
     "bot": "node src/app.js",
     "demo": "QUIMIGEN_MODE=fixture node src/cli/demo.js",
     "test": "node --test",
-    "verify": "npm test && node scripts/check-config.js --fixture"
+    "trigger:dev": "trigger.dev dev",
+    "trigger:deploy": "trigger.dev deploy",
+    "check:trigger": "node -e \"Promise.all([import('./trigger.config.mjs'), import('./trigger/daily-delivery.js')])\"",
+    "verify": "npm test && node scripts/check-config.js --fixture && npm run check:trigger"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "4.5.16"
+  },
+  "devDependencies": {
+    "trigger.dev": "4.5.16"
   }
 }

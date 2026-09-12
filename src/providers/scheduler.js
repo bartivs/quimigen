@@ -1,3 +1,45 @@
+import { schedules } from "@trigger.dev/sdk";
+
+export const DAILY_DELIVERY_TASK_ID = "quimigen-daily-delivery";
+
+export class TriggerScheduler {
+  constructor({
+    api = schedules,
+    environment = process.env.TRIGGER_ENV ?? "dev",
+    taskId = DAILY_DELIVERY_TASK_ID,
+  } = {}) {
+    this.api = api;
+    this.environment = environment;
+    this.taskId = taskId;
+  }
+
+  async createDailySchedule(plan) {
+    const [hour, minute] = plan.deliveryTime.split(":").map(Number);
+    const deduplicationKey = `${this.environment}:${plan.chatId}:${plan.id}`;
+    const schedule = await this.api.create({
+      task: this.taskId,
+      cron: `${minute} ${hour} * * *`,
+      timezone: plan.timezone,
+      externalId: plan.id,
+      deduplicationKey,
+    });
+    return {
+      id: schedule.id,
+      deduplicationKey,
+      active: schedule.active !== false,
+      simulated: false,
+    };
+  }
+
+  async deactivate(scheduleId) {
+    return this.api.deactivate(scheduleId);
+  }
+
+  async activate(scheduleId) {
+    return this.api.activate(scheduleId);
+  }
+}
+
 export class FixtureScheduler {
   constructor(environment = process.env.TRIGGER_ENV ?? "dev") {
     this.environment = environment;
@@ -21,20 +63,8 @@ export class FixtureScheduler {
   }
 }
 
-export class UnconfiguredLiveScheduler {
-  async createDailySchedule() {
-    throw new Error("Trigger.dev aún no está conectado en este build.");
-  }
-
-  async deactivate() {
-    throw new Error("Trigger.dev aún no está conectado en este build.");
-  }
-
-  async activate() {
-    throw new Error("Trigger.dev aún no está conectado en este build.");
-  }
-}
-
 export function createScheduler(mode = process.env.QUIMIGEN_MODE ?? "live") {
-  return mode === "fixture" ? new FixtureScheduler() : new UnconfiguredLiveScheduler();
+  if (mode === "fixture") return new FixtureScheduler();
+  if (mode === "live") return new TriggerScheduler();
+  throw new Error(`QUIMIGEN_MODE no soportado: ${mode}`);
 }
