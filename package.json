@@ -1,0 +1,16 @@
+{
+  "name": "quimigen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram curriculum-to-daily-practice agent for the Agents Everywhere hackathon",
+  "scripts": {
+    "bot": "node src/app.js",
+    "demo": "QUIMIGEN_MODE=fixture node src/cli/demo.js",
+    "test": "node --test",
+    "verify": "npm test && node scripts/check-config.js --fixture"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
