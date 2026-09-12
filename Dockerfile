@@ -12,8 +12,8 @@ RUN npm ci --include=dev --ignore-scripts \
     && npm cache clean --force
 
 COPY --chown=node:node . .
-RUN mkdir -p /data /run/trigger-auth \
-    && chown -R node:node /app /data /run/trigger-auth
+RUN mkdir -p /data /run/trigger-auth /app/.trigger \
+    && chown node:node /data /run/trigger-auth /app/.trigger
 
 USER node
 ENTRYPOINT ["/usr/bin/tini", "--"]
