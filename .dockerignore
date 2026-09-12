@@ -1,0 +1,10 @@
+.git
+.github
+.gitea
+.trigger
+.data
+.tmp
+.env
+node_modules
+*.log
+coverage

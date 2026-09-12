@@ -114,7 +114,7 @@ npm run check:trigger
 npm run verify
 ```
 
-See [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for contracts and [`docs/DEMO.md`](docs/DEMO.md) for the live/fallback runbook.
+See [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for contracts, [`docs/DEMO.md`](docs/DEMO.md) for the live/fallback runbook, and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the Gitea → `192.168.1.116` pipeline.
 
 ## Limits and trust
 

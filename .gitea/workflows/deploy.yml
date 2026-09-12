@@ -1,0 +1,101 @@
+name: test-and-deploy-quimigen
+
+# Gitea Actions is the homelab deployment path. A push to main tests the app,
+# stages source on 192.168.1.116, builds the image, and starts the two services
+# only when /opt/quimigen/.env has all required values.
+#
+# Required repository Actions secret:
+#   DEPLOY_SSH_KEY — dedicated ed25519 key authorized on root@192.168.1.116
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trust homelab CA for checkout
+        shell: bash
+        run: git config --global http.sslCAInfo /etc/ssl/certs/homelab-ca.crt
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and verify
+        shell: bash
+        run: |
+          npm ci
+          npm run verify
+          npm run demo:flow >/tmp/quimigen-demo-flow.log
+          grep -q 'TRIGGER SIMULATED' /tmp/quimigen-demo-flow.log
+
+      - name: Install deployment tools
+        shell: bash
+        run: |
+          set -eu
+          apt-get update -qq
+          apt-get install -y -qq openssh-client rsync >/dev/null
+
+      - name: Install deploy key
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -eu
+          test -n "$DEPLOY_SSH_KEY"
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > /tmp/quimigen-deploy-key
+          unset DEPLOY_SSH_KEY
+
+      - name: Stage and deploy on 192.168.1.116
+        shell: bash
+        run: |
+          set -eu
+          KEY=/tmp/quimigen-deploy-key
+          SSH="ssh -i $KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+          trap 'rm -f "$KEY"' EXIT
+
+          $SSH root@192.168.1.116 'install -d -m 0755 /opt/quimigen'
+          rsync -az --delete \
+            --exclude=.git \
+            --exclude=.env \
+            --exclude=.data \
+            --exclude=.trigger \
+            --exclude=node_modules \
+            -e "$SSH" \
+            ./ root@192.168.1.116:/opt/quimigen/
+
+          $SSH root@192.168.1.116 '
+            set -eu
+            cd /opt/quimigen
+            chmod 0755 scripts/check-deploy-env.sh
+            if [ ! -f .env ]; then
+              install -m 0600 .env.production.example .env
+            else
+              chmod 0600 .env
+            fi
+
+            docker compose -f compose.prod.yaml build
+            docker compose -f compose.prod.yaml run --rm --no-deps bot npm run demo:flow >/tmp/quimigen-demo-flow.log
+            grep -q "TRIGGER SIMULATED" /tmp/quimigen-demo-flow.log
+
+            if ! ./scripts/check-deploy-env.sh .env; then
+              touch CONFIG_REQUIRED
+              echo "QuimiGen staged and verified; configure /opt/quimigen/.env, then dispatch this workflow again."
+              exit 0
+            fi
+
+            rm -f CONFIG_REQUIRED
+            docker compose -f compose.prod.yaml up -d --remove-orphans
+            sleep 8
+            test "$(docker inspect -f "{{.State.Running}}" quimigen-bot)" = true
+            test "$(docker inspect -f "{{.State.Running}}" quimigen-trigger-worker)" = true
+            docker compose -f compose.prod.yaml ps
+          '

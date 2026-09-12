@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "trigger.dev": "4.5.16"
+  },
+  "overrides": {
+    "ws": "8.21.3"
   }
 }

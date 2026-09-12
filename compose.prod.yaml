@@ -1,0 +1,39 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: quimigen:local
+    container_name: quimigen-bot
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      QUIMIGEN_STATE_FILE: /data/state.json
+    volumes:
+      - quimigen-data:/data
+    security_opt:
+      - no-new-privileges:true
+
+  trigger-worker:
+    image: quimigen:local
+    container_name: quimigen-trigger-worker
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      QUIMIGEN_STATE_FILE: /data/state.json
+      XDG_CONFIG_HOME: /run/trigger-auth
+    command: ["node", "scripts/run-trigger-worker.js"]
+    volumes:
+      - quimigen-data:/data
+    tmpfs:
+      - /run/trigger-auth:uid=1000,gid=1000,mode=0700
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  quimigen-data:
+    name: quimigen-data
