@@ -9,6 +9,10 @@ RUN apt-get update \
 
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev --ignore-scripts \
+    && indexer=node_modules/trigger.dev/dist/esm/indexing/indexWorkerManifest.js \
+    && grep -q '}, 20_000);' "$indexer" \
+    && sed -i 's/}, 20_000);/}, 120_000);/' "$indexer" \
+    && grep -q '}, 120_000);' "$indexer" \
     && npm cache clean --force
 
 COPY --chown=node:node . .

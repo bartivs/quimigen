@@ -1,4 +1,4 @@
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
@@ -33,6 +33,9 @@ await writeFile(
 );
 await chmod(triggerConfigPath, 0o600);
 
+const readyPath = "/tmp/trigger-ready";
+await rm(readyPath, { force: true });
+
 const child = spawn(
   "./node_modules/.bin/trigger",
   [
@@ -42,13 +45,31 @@ const child = spawn(
     "trigger.config.mjs",
     "--project-ref",
     project,
+    "--max-concurrent-runs",
+    "1",
     "--skip-update-check",
     "--skip-telemetry",
     "--log-level",
     "log",
   ],
-  { stdio: "inherit", env: process.env },
+  { stdio: ["inherit", "pipe", "pipe"], env: process.env },
 );
+
+let output = "";
+function observe(chunk, destination) {
+  destination.write(chunk);
+  output = `${output}${chunk}`.slice(-8_192);
+  if (output.includes("Local worker ready")) {
+    writeFile(readyPath, new Date().toISOString(), { mode: 0o600 }).catch((error) => {
+      console.error(`Unable to record Trigger.dev readiness (${error.code ?? "unknown error"}).`);
+    });
+  }
+  if (output.includes("Error: Build failed")) {
+    child.kill("SIGTERM");
+  }
+}
+child.stdout.on("data", (chunk) => observe(chunk, process.stdout));
+child.stderr.on("data", (chunk) => observe(chunk, process.stderr));
 
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => child.kill(signal));

@@ -14,7 +14,7 @@ Gitea 192.168.1.117
               └─ quimigen-data volume (/data/state.json)
 ```
 
-The local Trigger.dev worker is deliberate demo scope. It keeps scheduled task execution beside the local JSON store. A Trigger.dev cloud deployment requires replacing JSON with a durable database reachable by both bot and cloud task.
+The local Trigger.dev worker is deliberate demo scope. It keeps scheduled task execution beside the local JSON store. A Trigger.dev cloud deployment requires replacing JSON with a durable database reachable by both bot and cloud task. The worker is limited to one concurrent run; its image extends the pinned CLI's indexing timeout for this 512 MiB LXC, and Compose reports healthy only after Trigger.dev confirms `Local worker ready`.
 
 ## CI/CD
 

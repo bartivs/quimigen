@@ -25,6 +25,12 @@ services:
       QUIMIGEN_STATE_FILE: /data/state.json
       XDG_CONFIG_HOME: /run/trigger-auth
     command: ["node", "scripts/run-trigger-worker.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:fs').accessSync('/tmp/trigger-ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 48
+      start_period: 10s
     volumes:
       - quimigen-data:/data
     tmpfs:

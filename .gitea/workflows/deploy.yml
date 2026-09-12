@@ -94,8 +94,17 @@ jobs:
 
             rm -f CONFIG_REQUIRED
             docker compose -f compose.prod.yaml up -d --remove-orphans
-            sleep 8
             test "$(docker inspect -f "{{.State.Running}}" quimigen-bot)" = true
-            test "$(docker inspect -f "{{.State.Running}}" quimigen-trigger-worker)" = true
+
+            attempts=0
+            until [ "$(docker inspect -f "{{.State.Health.Status}}" quimigen-trigger-worker)" = healthy ]; do
+              attempts=$((attempts + 1))
+              if [ "$attempts" -ge 48 ]; then
+                docker compose -f compose.prod.yaml logs --tail=100 trigger-worker
+                echo "Trigger.dev worker did not become ready in 240 seconds." >&2
+                exit 1
+              fi
+              sleep 5
+            done
             docker compose -f compose.prod.yaml ps
           '
