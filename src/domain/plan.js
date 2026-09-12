@@ -115,11 +115,11 @@ export function createDraftPlan(input, now = new Date()) {
 export function approvePlan(plan, actor, now = new Date()) {
   assertOwner(plan, actor);
   if (plan.status !== PLAN_STATUS.DRAFT) {
-    throw new Error("Solo un borrador puede aprobarse.");
+    throw new Error("Solo un borrador puede sellarse.");
   }
 
   if (hashQueue(plan.entries) !== plan.queueHash) {
-    throw new Error("La cola cambió; regenera la versión antes de aprobar.");
+    throw new Error("La cola cambió; regenera la versión antes de sellarla.");
   }
 
   return {
@@ -132,7 +132,7 @@ export function approvePlan(plan, actor, now = new Date()) {
 
 export function attachSchedule(plan, schedule, now = new Date()) {
   if (plan.status !== PLAN_STATUS.APPROVED_SCHEDULED) {
-    throw new Error("El plan debe estar aprobado antes de asociar un schedule.");
+    throw new Error("El plan debe estar sellado antes de asociar una programación.");
   }
   if (!schedule?.id || !schedule?.deduplicationKey) {
     throw new Error("El recibo del schedule está incompleto.");
@@ -169,7 +169,7 @@ export function resumePlan(plan, actor, now = new Date()) {
     throw new Error("Solo un plan pausado puede reanudarse.");
   }
   if (hashQueue(plan.entries) !== plan.queueHash) {
-    throw new Error("La cola cambió; requiere una nueva aprobación.");
+    throw new Error("La cola cambió; requiere una nueva versión sellada.");
   }
   return {
     ...plan,

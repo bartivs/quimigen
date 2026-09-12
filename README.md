@@ -1,6 +1,6 @@
 # QuimiGen
 
-Telegram agent that turns a curriculum file or public URL into a cited, reviewable study plan and uses **Trigger.dev** to deliver one approved problem per day.
+Telegram agent that turns a curriculum file or public URL into a cited, reviewable study plan and uses **Trigger.dev** to deliver one automatically sealed problem per day.
 
 Repository: https://github.com/bartivs/quimigen
 
@@ -12,15 +12,15 @@ Repository: https://github.com/bartivs/quimigen
 | Exa URL extraction and bounded research | Implemented; requires key |
 | OpenRouter structured plan generation | Implemented; requires key |
 | Full queue summary and Telegram preview | Implemented |
-| Exact owner/version approval | Implemented |
+| Automatic immutable queue sealing and scheduling | Implemented |
 | Per-plan Trigger.dev cron with IANA timezone | Implemented; requires project/key |
 | Idempotent daily Telegram delivery | Implemented |
-| Pause, confirmed resume, hint, and solution commands | Implemented |
+| Guided buttons, direct pause/resume, hints, and solutions | Implemented |
 | Deterministic no-network flow | Implemented |
 | Live credentialed end-to-end verification | Not run in this repository |
 | Production durable storage | V2 / not built |
 
-The safety invariant is fixed: **scheduled jobs deliver only immutable problems from the exact queue version the user approved. They never generate new outbound content.**
+The safety invariant is fixed: **scheduled jobs deliver only immutable problems from the exact queue version that was automatically sealed after generation. They never generate new outbound content.** There is no manual approval step.
 
 ## Architecture
 
@@ -31,9 +31,9 @@ Telegram file/URL
   → Exa research with URLs
   → OpenRouter full plan + problem queue
   → local JSON version/hash
-  → user approval
+  → automatic immutable queue sealing
   → Trigger.dev per-plan schedule
-  → one approved Telegram problem/day + receipt
+  → one problem from the sealed queue/day + receipt
 ```
 
 The local JSON adapter is deliberate hackathon scope. It lets the bot and the Trigger.dev **local dev worker** share state through one absolute `QUIMIGEN_STATE_FILE`. Replace it with a durable database before deploying the task to Trigger.dev cloud.
@@ -69,7 +69,7 @@ Use an **absolute** state path so both local processes resolve the same file:
 QUIMIGEN_STATE_FILE=/absolute/path/to/quimigen/.data/state.json
 ```
 
-Start Trigger.dev first so the scheduled task exists before approval:
+Start Trigger.dev first so the scheduled task exists before the bot automatically creates a schedule:
 
 ```bash
 npm run trigger:dev
@@ -85,17 +85,29 @@ Trigger.dev development schedules fire only while its dev CLI is running.
 
 ## Telegram flow
 
+Use `/start` and the inline buttons to create a plan without memorizing command syntax:
+
+```text
+Crear un plan
+→ choose days
+→ choose delivery time
+→ choose timezone
+→ send curriculum.md, curriculum.pdf, or one HTTPS URL
+→ receive the complete queue, already sealed and scheduled
+→ pause or resume with one tap
+```
+
+The advanced path remains available:
+
 ```text
 /plan 3 18:00 America/Asuncion
-→ send curriculum.md, curriculum.pdf, or one HTTPS URL
-→ review summary, sources, and every problem
-/approve QG-XXXXXX 1
-→ Trigger.dev schedule receipt
-/status QG-XXXXXX
-/pause QG-XXXXXX
-/resume QG-XXXXXX
-/confirm_resume QG-XXXXXX 1
+→ send the curriculum
+/status [planId]
+/pause [planId]
+/resume [planId]
 ```
+
+When the ID is omitted, controls select the latest applicable plan owned by the user in that chat. If schedule creation fails, the queue remains inactive and the UI offers a safe retry.
 
 After an entry arrives:
 
@@ -104,7 +116,7 @@ After an entry arrives:
 /solution QG-XXXXXX D1
 ```
 
-`/demo` creates a visibly labeled fixture draft inside a real Telegram chat. In fixture mode, approval creates only a `TRIGGER SIMULATED` schedule.
+`/demo` creates, seals, and automatically schedules a visibly labeled fixture plan inside a real Telegram chat. In fixture mode it creates only a `TRIGGER SIMULATED` schedule.
 
 ## Verification
 

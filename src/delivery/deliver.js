@@ -80,7 +80,7 @@ export async function deliverDueProblem({ store, telegram, planId, timestamp = n
 }
 
 export function formatDailyDelivery(plan, entry) {
-  return `PRÁCTICA DIARIA · ${plan.id} v${plan.version}\nDÍA ${entry.day} · ${entry.topic}\n\nObjetivo: ${entry.objective}\n\n${entry.problem}\n\nPista: /hint ${plan.id} ${entry.id}\nSolución: /solution ${plan.id} ${entry.id}\nPausar: /pause ${plan.id}\n\nContenido previamente aprobado · REVISIÓN REQUERIDA`;
+  return `PRÁCTICA DIARIA · ${plan.id} v${plan.version}\nDÍA ${entry.day} · ${entry.topic}\n\nObjetivo: ${entry.objective}\n\n${entry.problem}\n\nPista: /hint ${plan.id} ${entry.id}\nSolución: /solution ${plan.id} ${entry.id}\nPausar: /pause ${plan.id}\n\nContenido de la cola sellada automáticamente · REVISIÓN RECOMENDADA`;
 }
 
 function safeError(error) {
