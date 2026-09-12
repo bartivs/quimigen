@@ -34,7 +34,7 @@ await writeFile(
 await chmod(triggerConfigPath, 0o600);
 
 const child = spawn(
-  "./node_modules/.bin/trigger.dev",
+  "./node_modules/.bin/trigger",
   [
     "dev",
     "start",
@@ -53,6 +53,10 @@ const child = spawn(
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => child.kill(signal));
 }
+child.on("error", (error) => {
+  console.error(`Unable to start the Trigger.dev CLI (${error.code ?? "unknown error"}).`);
+  process.exitCode = 1;
+});
 child.on("exit", (code, signal) => {
   process.exitCode = code ?? (signal ? 1 : 0);
 });

@@ -7,22 +7,29 @@ if [ ! -f "$file" ]; then
   exit 1
 fi
 
+value_for() {
+  awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
+}
+
 required='TELEGRAM_BOT_TOKEN EXA_API_KEY OPENROUTER_API_KEY TRIGGER_PROJECT_REF TRIGGER_SECRET_KEY TRIGGER_CLI_ACCESS_TOKEN'
-missing=''
+issues=''
 for key in $required; do
-  value=$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file")
+  value=$(value_for "$key")
   case "$value" in
-    ''|change-me*|replace-me*) missing="$missing $key" ;;
+    ''|change-me*|replace-me*) issues="$issues $key" ;;
   esac
 done
 
-mode=$(awk -F= '$1 == "QUIMIGEN_MODE" { sub(/^[^=]*=/, ""); print; exit }' "$file")
-if [ "$mode" != "live" ]; then
-  missing="$missing QUIMIGEN_MODE=live"
+case "$(value_for TRIGGER_PROJECT_REF)" in proj_*) ;; *) issues="$issues TRIGGER_PROJECT_REF(must-start-with-proj_)" ;; esac
+case "$(value_for TRIGGER_SECRET_KEY)" in tr_dev_*) ;; *) issues="$issues TRIGGER_SECRET_KEY(must-be-development-key)" ;; esac
+case "$(value_for TRIGGER_CLI_ACCESS_TOKEN)" in tr_pat_*) ;; *) issues="$issues TRIGGER_CLI_ACCESS_TOKEN(must-start-with-tr_pat_)" ;; esac
+
+if [ "$(value_for QUIMIGEN_MODE)" != "live" ]; then
+  issues="$issues QUIMIGEN_MODE=live"
 fi
 
-if [ -n "$missing" ]; then
-  echo "CONFIG_REQUIRED: set these values in $file:$missing" >&2
+if [ -n "$issues" ]; then
+  echo "CONFIG_REQUIRED: correct these values in $file:$issues" >&2
   exit 1
 fi
 
