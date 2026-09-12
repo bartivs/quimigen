@@ -23,7 +23,7 @@ const ENTRY_SCHEMA = {
     problem: { type: "string" },
     hints: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
     solution: { type: "string" },
-    sourceUrls: { type: "array", minItems: 1, maxItems: 4, items: { type: "string", format: "uri" } },
+    sourceUrls: { type: "array", minItems: 1, maxItems: 4, items: { type: "string" } },
     reviewRequired: { type: "boolean" },
   },
 };
