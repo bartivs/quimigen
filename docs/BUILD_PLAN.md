@@ -1,5 +1,12 @@
 # QuimiGen MVP build plan
 
+## Build status — 2026-09-12
+
+- Slices 1–4 are implemented and covered by local tests.
+- Slice 5 operator docs, fixture runbook, and CI are implemented.
+- Live credentialed Telegram/Exa/OpenRouter/Trigger.dev verification remains pending because no provider secrets are available in this environment.
+- Production cloud persistence remains explicitly out of scope.
+
 ## Objective
 
 Build a local-first Telegram agent that turns a curriculum file or public URL into a cited study plan, shows the complete problem queue, requires explicit approval, and uses Trigger.dev to deliver one approved problem per day.

@@ -5,8 +5,9 @@
   "type": "module",
   "description": "Telegram curriculum-to-daily-practice agent for the Agents Everywhere hackathon",
   "scripts": {
-    "bot": "node src/app.js",
+    "bot": "node --env-file-if-exists=.env src/app.js",
     "demo": "QUIMIGEN_MODE=fixture node src/cli/demo.js",
+    "demo:flow": "QUIMIGEN_MODE=fixture node src/cli/demo-flow.js",
     "test": "node --test",
     "trigger:dev": "trigger.dev dev",
     "trigger:deploy": "trigger.dev deploy",
