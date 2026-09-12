@@ -21,7 +21,7 @@ await writeFile(
     profiles: {
       default: {
         accessToken: token,
-        ...(process.env.TRIGGER_API_URL ? { apiUrl: process.env.TRIGGER_API_URL } : {}),
+        apiUrl: process.env.TRIGGER_API_URL || "https://api.trigger.dev",
       },
     },
     settings: {
