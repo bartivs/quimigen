@@ -1,4 +1,4 @@
-import { schedules } from "@trigger.dev/sdk";
+import { configure, schedules } from "@trigger.dev/sdk";
 
 export const DAILY_DELIVERY_TASK_ID = "quimigen-daily-delivery";
 
@@ -7,7 +7,11 @@ export class TriggerScheduler {
     api = schedules,
     environment = process.env.TRIGGER_ENV ?? "dev",
     taskId = DAILY_DELIVERY_TASK_ID,
+    baseURL = process.env.TRIGGER_API_URL,
+    configureApi = configure,
   } = {}) {
+    // An empty optional .env value overrides the SDK's nullish default.
+    if (api === schedules) configureApi({ baseURL: baseURL?.trim() || "https://api.trigger.dev" });
     this.api = api;
     this.environment = environment;
     this.taskId = taskId;
