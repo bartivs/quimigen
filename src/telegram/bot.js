@@ -13,6 +13,7 @@ import {
   validateTimezone,
 } from "../domain/plan.js";
 import { createPlanFromCurriculum } from "../curriculum/create-plan.js";
+import { runStage } from "../curriculum/stage.js";
 import { extractDocument, sourceFromUrlExtraction } from "../curriculum/extract.js";
 import { FixtureModelClient, FixtureResearchClient } from "../providers/fixture.js";
 import { HELP_TEXT, WELCOME_TEXT, formatPlanPreview, formatStatus } from "./format.js";
@@ -250,17 +251,18 @@ export class QuimiGenBot {
   async #consumeCurriculum(message, intake) {
     await this.telegram.sendMessage(
       intake.chatId,
-      "Recibido. Estoy analizando el currículo y preparando la cola completa; después programaré las entregas automáticamente.",
+      "Recibido. Estoy analizando el currículo y preparando la cola completa; puede tardar varios minutos. Después programaré las entregas automáticamente. No necesitas reenviar el archivo mientras esperas.",
     );
     let temporaryDirectory;
+    let savedPlan;
     try {
       let source;
       if (message.document) {
         temporaryDirectory = await mkdtemp(join(tmpdir(), "quimigen-upload-"));
-        const downloaded = await this.telegram.downloadDocument(message.document, temporaryDirectory);
+        const downloaded = await runStage("Telegram · descarga", () => this.telegram.downloadDocument(message.document, temporaryDirectory));
         source = await extractDocument(downloaded.path, downloaded.fileName);
       } else {
-        const extraction = await this.research.getUrlText(message.text.trim());
+        const extraction = await runStage("Exa · extracción", () => this.research.getUrlText(message.text.trim()));
         source = sourceFromUrlExtraction(extraction);
       }
       const plan = await createPlanFromCurriculum({
@@ -270,9 +272,14 @@ export class QuimiGenBot {
         research: this.research,
         now: this.now(),
       });
-      await this.store.putPlan(plan);
+      savedPlan = await this.store.putPlan(plan);
       await this.store.clearPendingIntake(intake.chatId);
       await this.#scheduleAndPresent(plan, { fixture: this.fixture });
+    } catch (error) {
+      await this.telegram.sendMessage(intake.chatId, savedPlan
+        ? `El plan ${savedPlan.id} está guardado, pero no pude completar la confirmación. Consulta /status ${savedPlan.id} antes de reintentar; las entregas podrían estar activas.`
+        : `No pude crear el plan: ${safeError(error)}\nNo se programaron entregas. Conservé tus días y horario: reenvía el archivo o la URL para reintentar, o cancela la configuración.`,
+      savedPlan ? navigationKeyboard() : cancelKeyboard());
     } finally {
       if (temporaryDirectory) await rm(temporaryDirectory, { recursive: true, force: true });
     }
@@ -321,7 +328,7 @@ export class QuimiGenBot {
 
   async #sealAndSchedule(plan) {
     const sealed = approvePlan(plan, { chatId: plan.chatId, userId: plan.ownerUserId }, this.now());
-    const schedule = await this.scheduler.createDailySchedule(sealed);
+    const schedule = await runStage("Trigger · programación", () => this.scheduler.createDailySchedule(sealed));
     const scheduled = attachSchedule(sealed, schedule, this.now());
     return this.store.transactPlan(plan.id, (current) => {
       if (current.version !== plan.version || current.queueHash !== plan.queueHash || current.status !== plan.status) {

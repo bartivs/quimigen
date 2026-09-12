@@ -73,3 +73,19 @@ test("OpenRouter requires strict structured output and parses the JSON message",
   assert.equal(requestBody.response_format.json_schema.strict, true);
   assert.equal(requestBody.provider.require_parameters, true);
 });
+
+
+test("OpenRouter gives both model passes a bounded configurable generation deadline", async () => {
+  const calls = [];
+  const client = new OpenRouterClient({ apiKey: "test", timeoutMs: 180000,
+    request: async (_url, options) => { calls.push(options); return { choices: [{ message: { content: "{}" } }] }; },
+  });
+  await client.outlineCurriculum("Synthetic curriculum", 7);
+  await client.generatePlan({ outline: {}, sources: [], days: 7 });
+  assert.deepEqual(calls.map(c => c.timeoutMs), [180000, 180000]);
+  assert.match(calls[0].requestName, /análisis/);
+  assert.match(calls[1].requestName, /generación/);
+  for (const timeoutMs of [NaN, 0, -1, 600001]) {
+    assert.throws(() => new OpenRouterClient({ apiKey: "test", timeoutMs }), /OPENROUTER_TIMEOUT_MS/);
+  }
+});

@@ -1,10 +1,13 @@
 import { createDraftPlan } from "../domain/plan.js";
+import { runStage } from "./stage.js";
 
 export async function createPlanFromCurriculum({ input, source, model, research, now = new Date() }) {
-  const outline = validateOutline(await model.outlineCurriculum(source.text, input.days));
-  const researchSources = await research.search(outline.researchQueries);
+  const outline = validateOutline(await runStage("OpenRouter · análisis", () =>
+    model.outlineCurriculum(source.text, input.days)));
+  const researchSources = await runStage("Exa · investigación", () => research.search(outline.researchQueries));
+  if (researchSources.length === 0) throw new Error("Exa no encontró fuentes utilizables. Reenvía el currículo para reintentar.");
   const generated = validateGeneratedPlan(
-    await model.generatePlan({ outline, sources: researchSources, days: input.days }),
+    await runStage("OpenRouter · generación", () => model.generatePlan({ outline, sources: researchSources, days: input.days })),
     input.days,
     researchSources,
   );

@@ -33,11 +33,16 @@ export class OpenRouterClient {
     apiKey = process.env.OPENROUTER_API_KEY,
     model = process.env.OPENROUTER_MODEL ?? "openai/gpt-4.1-mini",
     request = fetchJson,
+    timeoutMs = Number(process.env.OPENROUTER_TIMEOUT_MS ?? 180_000),
   } = {}) {
     if (!apiKey) throw new Error("OPENROUTER_API_KEY no está configurada.");
     this.apiKey = apiKey;
     this.model = model;
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 600_000) {
+      throw new Error("OPENROUTER_TIMEOUT_MS debe estar entre 1000 y 600000 ms.");
+    }
     this.request = request;
+    this.timeoutMs = timeoutMs;
   }
 
   async outlineCurriculum(text, days) {
@@ -88,6 +93,8 @@ export class OpenRouterClient {
   async #structured(name, schema, messages) {
     const response = await this.request("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
+      timeoutMs: this.timeoutMs,
+      requestName: name === "quimigen_curriculum_outline" ? "OpenRouter · análisis" : "OpenRouter · generación",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${this.apiKey}`,

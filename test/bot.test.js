@@ -143,3 +143,39 @@ test("a scheduling failure keeps the sealed candidate inactive and offers a safe
   await bot.handleUpdate(callback(`plan:schedule:${draft.id}`));
   assert.equal((await store.getPlan(draft.id)).status, "APPROVED_SCHEDULED");
 });
+
+
+for (const stage of ["outlineCurriculum", "search", "generatePlan"]) {
+  test(`timeout in ${stage} preserves intake and retry creates only one sealed plan`, async (t) => {
+    const { bot, telegram, store } = await harness(t);
+    const provider = stage === "search" ? bot.research : bot.model;
+    const original = provider[stage].bind(provider);
+    provider[stage] = async () => { throw new DOMException("timeout", "TimeoutError"); };
+    await bot.handleUpdate(update("/plan 3 18:00 UTC"));
+    await bot.handleUpdate(update("https://example.com/curriculum"));
+    assert.equal((await store.listPlansForChat("100")).length, 0);
+    assert.equal((await store.getPendingIntake("100")).stage, "source");
+    assert.match(telegram.messages.at(-1).text, /tiempo de espera/);
+    assert.match(telegram.messages.at(-1).text, /No se programaron entregas/);
+    provider[stage] = original;
+    await bot.handleUpdate(update("https://example.com/curriculum"));
+    const plans = await store.listPlansForChat("100");
+    assert.equal(plans.length, 1);
+    assert.equal(plans[0].status, "APPROVED_SCHEDULED");
+    assert.equal(await store.getPendingIntake("100"), null);
+  });
+}
+
+test("preview timeout does not claim the already scheduled plan was rolled back", async (t) => {
+  const { bot, telegram, store } = await harness(t);
+  const send = telegram.sendMessage.bind(telegram);
+  telegram.sendMessage = async (chatId, text, extra) => {
+    if (text.includes("COLA COMPLETA")) throw new DOMException("timeout", "TimeoutError");
+    return send(chatId, text, extra);
+  };
+  await bot.handleUpdate(update("/plan 3 18:00 UTC"));
+  await bot.handleUpdate(update("https://example.com/curriculum"));
+  assert.equal((await store.listPlansForChat("100"))[0].status, "APPROVED_SCHEDULED");
+  assert.match(telegram.messages.at(-1).text, /entregas podrían estar activas/);
+  assert.match(telegram.messages.at(-1).text, /status/);
+});

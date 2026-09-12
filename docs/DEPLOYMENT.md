@@ -70,3 +70,11 @@ docker compose -f compose.prod.yaml logs -f trigger-worker
 ```
 
 The named `quimigen-data` volume persists plans and receipts. Never delete it during routine deployment.
+
+### Generation timeouts
+
+Use `OPENROUTER_MODEL=openai/gpt-4.1-mini` for the demo. On this host, a synthetic seven-day curriculum completed outline, live Exa research, and validated generation in approximately 24 seconds; the previously configured `deepseek/deepseek-v4.1-flash` exceeded 180 seconds in generation. This is a diagnostic measurement, not a latency guarantee.
+
+`OPENROUTER_TIMEOUT_MS` defaults to 180000 per model pass (allowed: 1000–600000). Telegram and Exa retain independent deadlines. No automatic HTTP retries are added, especially for potentially delivered Telegram messages.
+
+Bot logs include `quimigen_stage` start/completion/failure events and elapsed milliseconds for extraction/download, outline, research, generation, and scheduling, without prompts, source text, chat IDs, or credentials. Generation failure retains the input settings: resend the curriculum to retry. If confirmation fails after saving, consult `/status` before retrying; the plan may already be active. A schedule failure leaves a non-deliverable draft with a retry button.
