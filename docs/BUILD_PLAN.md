@@ -9,7 +9,7 @@
 
 ## Objective
 
-Build a local-first Telegram agent that turns a curriculum file or public URL into a cited study plan, shows the complete problem queue, requires explicit approval, and uses Trigger.dev to deliver one approved problem per day.
+Build a local-first Telegram agent that turns a curriculum file or public URL into a cited study plan, shows the complete problem queue, automatically seals its exact version, and uses Trigger.dev to deliver one sealed problem per day without a manual approval step.
 
 The MVP is generic across subjects. Chemistry entries may include deterministic checks later; all generated content remains marked for user review.
 
@@ -17,13 +17,12 @@ The MVP is generic across subjects. Chemistry entries may include deterministic 
 
 In under two minutes:
 
-1. Send `/plan 3 18:00 America/Asuncion` to the Telegram bot.
+1. Send `/start`, tap **Crear un plan**, and choose days, time, and timezone with inline buttons (or use `/plan 3 18:00 America/Asuncion`).
 2. Attach a UTF-8 text/Markdown/PDF curriculum or send one public HTTPS URL.
 3. See extracted objectives, Exa sources, a three-day plan summary, and the complete three-problem queue.
-4. Send `/approve <planId> <version>`.
-5. See the Trigger.dev schedule receipt and next delivery time.
-6. Trigger the scheduled task in the Trigger.dev dashboard and receive exactly one approved problem in Telegram.
-7. Send `/pause <planId>` and see that the schedule is disabled.
+4. See that the exact queue version was sealed and the Trigger.dev schedule was created automatically.
+5. Trigger the scheduled task in the Trigger.dev dashboard and receive exactly one sealed problem in Telegram.
+6. Tap **Pausar entregas** and see that the schedule is disabled.
 
 ## Product contract
 
@@ -31,14 +30,14 @@ In under two minutes:
 
 | Command | Result |
 |---|---|
-| `/start`, `/help` | Explain supported inputs and privacy limits. |
-| `/plan <days> <HH:MM> <IANA timezone>` | Start curriculum intake. MVP range: 1–7 days. |
-| `/approve <planId> <version>` | Approve exactly the visible queue version and create/update its Trigger.dev schedule. |
-| `/status <planId>` | Show state, version, next delivery, and delivered count. |
-| `/pause <planId>` | Disable future deliveries. |
-| `/resume <planId>` | Show next delivery and require confirmation before reactivating. |
-| `/confirm_resume <planId>` | Reactivate the unchanged approved version. |
-| `/demo` | Run the same flow with visibly labeled local fixtures. |
+| `/start`, `/help` | Show guided inline buttons, supported inputs, and privacy limits. |
+| `/plan` | Start a button-guided setup for days, delivery time, and timezone. |
+| `/plan <days> <HH:MM> <IANA timezone>` | Advanced shortcut to curriculum intake. MVP range: 1–7 days. |
+| `/status [planId]` | Show state, version, next delivery, and delivered count; defaults to the latest owned plan. |
+| `/pause [planId]` | Disable future deliveries; defaults to the latest active owned plan. |
+| `/resume [planId]` | Reactivate the unchanged sealed version directly. |
+| `/schedule [planId]` | Retry schedule creation for a generated queue that remained inactive after a provider failure. |
+| `/demo` | Run the same automatically scheduled flow with visibly labeled local fixtures. |
 
 ### Input limits
 
@@ -48,11 +47,11 @@ In under two minutes:
 - Source text is capped before model calls.
 - Uploaded files are downloaded to a temporary directory and deleted after extraction.
 
-### Approval invariant
+### Approval invariant (automatic sealing)
 
-The model generates every daily entry before approval. The preview includes the full queue, not only its summary. Approval records a SHA-256 hash of the normalized queue. Editing or regenerating increments the version, clears approval, and pauses/deactivates the schedule.
+The model generates every daily entry before the system approves/seals the queue automatically. The preview includes the full queue, not only its summary. Automatic approval records a SHA-256 hash of the normalized queue and requires no user command. Editing or regenerating increments the version, clears the seal, and pauses/deactivates the schedule until the new complete queue is validated and sealed.
 
-The scheduled task **never invokes a model**. It reads one immutable approved entry and sends it. This keeps every outbound problem inside the approved set.
+The scheduled task **never invokes a model**. It reads one immutable entry from the exact automatically approved queue version and sends it. This keeps every outbound problem inside the approved set while removing the manual approval step.
 
 ## Architecture
 
@@ -63,7 +62,7 @@ Telegram getUpdates
   ├─ Exa Search → titled URLs + excerpts
   ├─ OpenRouter pass 2 → summary + complete daily queue
   ├─ local JSON store → version/hash/status/receipts
-  └─ approval → Trigger.dev schedules.create
+  └─ automatic queue sealing → Trigger.dev schedules.create
                          ↓
 Trigger.dev schedules.task(timestamp, timezone, externalId=planId)
   └─ local JSON store → approved entry for local date
@@ -75,16 +74,18 @@ The local JSON store is intentional for the hackathon demo and no-network fallba
 ## State machine
 
 ```text
-AWAITING_SOURCE
+CONFIGURING
+  → AWAITING_SOURCE
   → GENERATING
-  → DRAFT
-  → APPROVED_SCHEDULED
+  → APPROVED_SCHEDULED (automatic seal)
   → PAUSED
   → APPROVED_SCHEDULED
   → COMPLETED
 
+A schedule provider failure leaves the validated queue in `DRAFT` with no active deliveries and a safe retry action.
+
 Any content change:
-DRAFT|APPROVED_SCHEDULED|PAUSED → DRAFT(version + 1, approval cleared)
+DRAFT|APPROVED_SCHEDULED|PAUSED → DRAFT(version + 1, seal cleared)
 ```
 
 Invalid transitions return a user-facing message and do not mutate provider state.
@@ -143,15 +144,15 @@ Expected files: `src/providers/exa.ts`, `src/providers/openrouter.ts`, `src/curr
 
 Verification: `npm test`, fixture CLI creates a valid draft.
 
-### Slice 3 — Telegram conversation and approval
+### Slice 3 — guided Telegram conversation and automatic sealing
 
 Expected files: `src/telegram/*`, `src/app.ts`.
 
 - Long-poll Telegram without webhook deployment.
-- Implement commands and pending intake state.
-- Chunk complete queue previews safely.
+- Implement guided inline-button setup, command shortcuts, and pending intake state.
+- Chunk complete queue previews safely and attach controls only to the final chunk.
 - Enforce owner/chat authorization.
-- Require exact plan ID and version to approve.
+- Seal the exact queue version and create its schedule automatically after generation.
 
 Verification: mocked Telegram update tests and fixture transcript.
 
@@ -182,16 +183,16 @@ Verification: `npm run verify` from a clean install.
 - No Google Classroom, LMS, grading, student analytics, OCR, voice, payments, or multi-tenant admin UI.
 - No autonomous web browsing outside Exa.
 - No model-generated content at delivery time.
-- No automatic outbound messages before queue approval.
+- No automatic outbound messages before the exact queue version has been validated, hashed, and automatically approved/sealed.
 - No claim that plans improve grades or that generated problems are certified correct.
 - No production cloud persistence in the MVP.
 
 ## Definition of done
 
-- Tests cover the state machine, queue hash, authorization, schedule dedupe, duplicate delivery, stale run, and fixture flow.
+- Tests cover the state machine, queue hash, authorization, automatic sealing, guided callbacks, safe schedule retry, schedule dedupe, duplicate delivery, stale run, and fixture flow.
 - `npm run verify` passes.
 - A real Telegram bot can ingest one supported source and preview a complete queue.
-- With credentials, approval creates a real Trigger.dev schedule.
-- A Trigger.dev test run sends one approved Telegram problem and records its receipt.
+- With credentials, generation automatically creates a real Trigger.dev schedule for the sealed queue.
+- A Trigger.dev test run sends one problem from the exact sealed queue and records its receipt.
 - Fixture mode reproduces the flow with visible labels and no network.
 - README distinguishes implemented, simulated, and future behavior.

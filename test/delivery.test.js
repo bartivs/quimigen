@@ -65,7 +65,7 @@ test("delivers one approved entry and refuses a duplicate run", async (t) => {
   assert.equal(first.status, "sent");
   assert.equal(first.completed, true);
   assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /Contenido previamente aprobado/);
+  assert.match(sent[0].text, /cola sellada automáticamente/);
 
   const second = await deliverDueProblem({
     store,

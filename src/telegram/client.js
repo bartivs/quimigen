@@ -17,23 +17,31 @@ export class TelegramClient {
     const body = await this.#call("getUpdates", {
       offset,
       timeout,
-      allowed_updates: ["message"],
+      allowed_updates: ["message", "callback_query"],
     }, (timeout + 10) * 1_000);
     return body.result ?? [];
   }
 
   async sendMessage(chatId, text, extra = {}) {
     const messages = [];
-    for (const chunk of chunkText(text)) {
+    const chunks = chunkText(text);
+    for (const [index, chunk] of chunks.entries()) {
       const body = await this.#call("sendMessage", {
         chat_id: String(chatId),
         text: chunk,
         link_preview_options: { is_disabled: true },
-        ...extra,
+        ...(index === chunks.length - 1 ? extra : {}),
       });
       messages.push(body.result);
     }
     return messages;
+  }
+
+  async answerCallbackQuery(callbackQueryId) {
+    const body = await this.#call("answerCallbackQuery", {
+      callback_query_id: String(callbackQueryId),
+    });
+    return body.result;
   }
 
   async downloadDocument(document, directory) {
